@@ -1,0 +1,65 @@
+# Retrieve arguments
+domain=$1
+path=$2
+is_public=$3
+version='0.9-rc2'
+final_path=/var/www/kiwix
+
+port=''
+findPort () {
+
+    port=$1
+
+    sudo yunohost app checkport $port
+    while [[ ! $? -eq 0 ]]
+        do
+            port=$(($port + 1))
+            sudo yunohost app checkport $port
+        done
+
+   return $port
+}
+
+# Check domain/path availability
+sudo yunohost app checkurl $domain$path -a kiwix
+if [[ ! $? -eq 0 ]]; then
+    exit 1
+fi
+
+# Copy files to the right place
+sudo mkdir -p $final_path
+sudo tar jxvf ../sources/'kiwix-'$version'-linux-i686.tar.bz2' -C $final_path/..
+sudo cp ../conf/library.xml $final_path
+
+# Find available ports
+findPort 8080
+kiwix_port=$port
+
+# Modify Nginx configuration file and copy it to Nginx conf directory
+sed -i "s@PATHTOCHANGE@$path@g" ../conf/nginx.conf
+sed -i "s@ALIASTOCHANGE@$final_path/@g" ../conf/nginx.conf
+sed -i "s@KIWIX_PORT@$kiwix_port@g" ../conf/nginx.conf
+sudo cp ../conf/nginx.conf /etc/nginx/conf.d/$domain.d/kiwix.conf
+
+# Add Kiwix-Server to startup
+sed -i "s@KIWIX_PORT@$kiwix_port@g" ../conf/kiwix-server
+sed -i "s@KIWIX_DIR@$final_path@g" ../conf/kiwix-server
+sudo cp ../conf/kiwix-server /etc/init.d
+sudo chmod +x /etc/init.d/kiwix-server
+sudo update-rc.d kiwix-server defaults
+
+if [ "$is_public" = "No" ];
+then
+	sudo yunohost app setting kiwix skipped_uris -d
+	sudo yunohost app ssowatconf
+else
+	sudo yunohost app setting kiwix skipped_uris -v "/"
+fi
+
+# Start Kiwix-Server
+sudo /etc/init.d/kiwix-server start
+
+# Reload Nginx and regenerate SSOwat conf
+sudo service nginx reload
+sudo yunohost app ssowatconf
+

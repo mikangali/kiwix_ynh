@@ -1,0 +1,1 @@
+Kiwix 0.9 rc2 packaged for Yunohost

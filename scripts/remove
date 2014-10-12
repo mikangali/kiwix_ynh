@@ -1,0 +1,9 @@
+#!/bin/bash
+domain=$(sudo yunohost app setting kiwix domain)
+
+sudo rm -rf /var/www/kiwix
+sudo rm -f /etc/nginx/conf.d/$domain.d/kiwix.conf
+
+sudo /etc/init.d/kiwix-server stop
+sudo rm -f /etc/init.d/kiwix-server
+
